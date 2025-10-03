@@ -58,11 +58,13 @@ def rodar_simulacao(tamanho=5, max_steps=60):
     bateria = 30
 
     estados = []
+    total_pontuacao = 0
 
     for _ in range(max_steps):
         norte, sul, leste, oeste, est = sensores(grid, x, y)
         prioridade = sensoresPr(grid, x, y)
-        acao, bateria = aspiradorSimples(norte, sul, leste, oeste, est, bateria, prioridade)
+        acao, bateria, pontuacao = aspiradorSimples(norte, sul, leste, oeste, est, bateria, prioridade)
+        total_pontuacao += pontuacao
 
         if acao == "aspirar":
             grid[x][y] = "limpo"
@@ -81,7 +83,8 @@ def rodar_simulacao(tamanho=5, max_steps=60):
             'grid': np.copy(grid),
             'x': x,
             'y': y,
-            'bateria': bateria
+            'bateria': bateria,
+            'pontuacao': total_pontuacao
         })
 
     return estados, grid
@@ -104,8 +107,10 @@ def simulacao():
     ax.set_ylim(-0.5, tamanho - 0.5)
 
     agent_marker = ax.plot([], [], 'o', markersize=20)[0]
+    
+    score_text = ax.text(0.01, 0.01, "", transform=ax.transAxes, fontsize=12, va='bottom', ha='left', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=4))
 
-    texts = [[None for _ in range(tamanho)] for _ in range(tamanho)]
+    texts = [[None for i in range(tamanho)] for i in range(tamanho)]
     movel_patches = []
 
     def desenhar_estado_inicial():
@@ -131,13 +136,13 @@ def simulacao():
                     txt = ''
                     cor = 'lightgray'
 
-                texts[i][j] = ax.text(j, i, txt, ha='center', va='center',
-                                      fontsize=14, color=cor, weight='bold')
+                texts[i][j] = ax.text(j, i, txt, ha='center', va='center', fontsize=14, color=cor, weight='bold')
 
     desenhar_estado_inicial()
 
     primeiro = estados[0]
     agent_marker.set_data([primeiro['y']], [primeiro['x']])
+    score_text.set_text(f"Pontuação: {primeiro.get('pontuacao', 0)}  Bateria: {primeiro.get('bateria', 0)}")
 
     def update(frame):
         estado = estados[frame]
@@ -167,6 +172,10 @@ def simulacao():
                     text_artist.set_color('lightgray')
 
         agent_marker.set_data([y], [x])
+        
+        pontuacao = estado.get('pontuacao', 0)
+        bateria = estado.get('bateria', 0)
+        score_text.set_text(f"Pontuação: {pontuacao}  Bateria: {bateria}")
 
         artists = [agent_marker] + [t for row in texts for t in row]
         return artists
