@@ -21,7 +21,7 @@ class Agente_BDI:
             return True
         return False
     
-    def detecta_tipo_sujeira(sujeira):
+    def detecta_tipo_sujeira(self, sujeira):
         if sujeira == "poeira":
             return 1
         elif sujeira == "liquido":
@@ -42,19 +42,19 @@ class Agente_BDI:
 
         #Detecta Sul
         if x + 1 < tamanho and self.pode_mover(x + 1, y) and self.grid[x + 1][y] in sujeira:
-            espaço_sujo = {"coord": (x+1,y), "pontos": self.detecta_tipo_sujeira(sujeira)}
+            espaço_sujo = {"coord": (x+1,y), "pontos": self.detecta_tipo_sujeira(self.grid[x+1][y])}
             self.beliefs.append(espaço_sujo)
         #Detecta Norte
         if x - 1 >= 0 and self.pode_mover(x - 1, y) and self.grid[x - 1][y] in sujeira:
-            espaço_sujo = {"coord": (x-1,y), "pontos": self.detecta_tipo_sujeira(sujeira)}
+            espaço_sujo = {"coord": (x-1,y), "pontos": self.detecta_tipo_sujeira(self.grid[x-1][y])}
             self.beliefs.append(espaço_sujo)
         #Detecta leste
         if y + 1 < tamanho and self.pode_mover(x, y + 1) and self.grid[x][y + 1] in sujeira:
-            espaço_sujo = {"coord": (x,y+1), "pontos": self.detecta_tipo_sujeira(sujeira)}
+            espaço_sujo = {"coord": (x,y+1), "pontos": self.detecta_tipo_sujeira(self.grid[x][y+1])}
             self.beliefs.append(espaço_sujo)
         #Detecta oeste
         if y - 1 >= 0 and self.pode_mover(x, y - 1) and self.grid[x][y - 1] in sujeira:
-            espaço_sujo = {"coord": (x,y-1), "pontos": self.detecta_tipo_sujeira(sujeira)}
+            espaço_sujo = {"coord": (x,y-1), "pontos": self.detecta_tipo_sujeira(self.grid[x][y-1])}
             self.beliefs.append(espaço_sujo)
 
     def distancia_a_estrela(self,inicio,fim):
@@ -309,28 +309,28 @@ class Agente_BDI:
                 self.update_intentions(posicao_atual)
         
 
+def simular():
+    agente = Agente_BDI(tamanho=5)
+    x, y = 0,0
 
-agente = Agente_BDI(tamanho=5)
-x, y = 0,0
-
-while agente.bateria > 0:
-    agente.perceive((x, y))
-    agente.update_desires((x,y))
-    agente.update_intentions((x,y))
-    if agente.intentions:
-        acao = agente.intentions[0]
-        if acao == "aspirar":
-            agente.grid[x][y] = "limpo"
-            agente.bateria -= 2
-        elif acao == "N":
-            x -= 1
-            agente.bateria -= 1
-        elif acao == "S":
-            x += 1
-            agente.bateria -= 1
-        elif acao == "L":
-            y += 1
-            agente.bateria -= 1
-        elif acao == "O":
-            y -= 1
-            agente.bateria -= 1
+    while agente.bateria > 0:
+        agente.perceive((x, y))
+        agente.update_desires((x,y))
+        agente.update_intentions((x,y))
+        if agente.intentions:
+            acao = agente.intentions[0]
+            if acao == "aspirar":
+                agente.grid[x][y] = "limpo"
+                agente.bateria -= 2
+            elif acao == "N":
+                x -= 1
+                agente.bateria -= 1
+            elif acao == "S":
+                x += 1
+                agente.bateria -= 1
+            elif acao == "L":
+                y += 1
+                agente.bateria -= 1
+            elif acao == "O":
+                y -= 1
+                agente.bateria -= 1
