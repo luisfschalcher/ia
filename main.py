@@ -1,7 +1,7 @@
 #from reativoSimples import simulacao
 from modelo import simulacao
-from Agente_BDI import simular
+from Agente_BDI import simular_BDI
 
 if __name__ == "__main__":
-    #simular()
-    simulacao()
+    simular_BDI()
+    #simulacao()

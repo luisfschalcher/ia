@@ -8,9 +8,8 @@ import heapq
 class Agente_BDI:
     def __init__(self, tamanho):
         self.beliefs = [] #guarda coordenadas de sujeira
-        self.desires = []
-        self.intentions = []
-        self.plans = []
+        self.desires = [] #guarda ordem otimizada de visitação das sujeiras
+        self.intentions = [] #guarda ordem de ações com base em desires
         self.grid = inicializar_ambiente(tamanho)
         self.bateria = 30
 
@@ -135,8 +134,6 @@ class Agente_BDI:
                     pontuacao = belief["pontos"]
 
                     # Heurística de score:
-                    # - pontuacao^2: dá peso exponencial (detritos=9, líquido=4, poeira=1)
-                    # - distancia+1: evita divisão por zero e penaliza distâncias longas
                     score = (pontuacao ** 2) / (distancia+1)
 
                     if score > melhor_score:
@@ -166,7 +163,7 @@ class Agente_BDI:
 
         return rota
 
-    def update_desires(self, posicao_atual): #calcula melhor rota (maior pontuação) para limpar a sujeira conhecida
+    def update_desires(self, posicao_atual):
         """
         Atualiza desires com a melhor rota de limpeza.
 
@@ -281,7 +278,7 @@ class Agente_BDI:
         if posicao_atual == coord_objetivo:
             self.intentions = ["aspirar"]
             # Remove objetivo dos desires após aspirar
-            self.desires.pop(0)
+            # self.desires.pop(0)
             return
 
         # Calcula próximo passo em direção ao objetivo
@@ -297,7 +294,7 @@ class Agente_BDI:
                 self.update_intentions(posicao_atual)
         
 
-def simular(tamanho=5, max_steps=100, intervalo_ms=500):
+def simular_BDI(tamanho=5, max_steps=100, intervalo_ms=500):
     agente = Agente_BDI(tamanho=tamanho)
     x, y = 0, 0
 
@@ -314,7 +311,10 @@ def simular(tamanho=5, max_steps=100, intervalo_ms=500):
             dedup[b['coord']] = b
         agente.beliefs = list(dedup.values())
 
-        agente.update_desires((x, y))
+        # Só recalcula desires se estiver vazio ou se beliefs mudaram significativamente
+        if not agente.desires or len(agente.beliefs) != len(agente.desires):
+            agente.update_desires((x, y))
+
         agente.update_intentions((x, y))
 
         if not agente.intentions:
@@ -331,6 +331,8 @@ def simular(tamanho=5, max_steps=100, intervalo_ms=500):
             agente.grid[x][y] = "limpo"
             agente.bateria -= 2
             agente.beliefs = [b for b in agente.beliefs if b['coord'] != (x, y)]
+            # Remove de desires após limpar com sucesso
+            agente.desires = [d for d in agente.desires if d['coord'] != (x, y)]
         elif acao == "N":
             if x > 0 and agente.pode_mover(x - 1, y):
                 x -= 1
