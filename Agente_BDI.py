@@ -29,33 +29,21 @@ class Agente_BDI:
         else:
             return 3
     
-    def perceive(self, posicao): #analisa espaços próximos e guarda em beliefs onde tem sujeira e seu tipo
+    def perceive(self, posicao):
         """
-        Analisa espaços próximos e guarda em beliefs onde tem sujeira e seu tipo
-        Retorno: self.beliefs recebe posição e tipos das sujeiras detectadas
+        Detecta todas as sujeiras no grid (percepção global).
+        Atualiza self.beliefs como lista de dicts {"coord": (x,y), "pontos": n}
         """
         sujeira = {"poeira", "liquido", "detritos"}
-        tamanho = len(self.grid)
-        espaço_sujo = {}
-        x = posicao[0]
-        y = posicao[1]
+        self.beliefs = []  # reinicia beliefs
+        linhas = len(self.grid)
+        colunas = len(self.grid[0])
 
-        #Detecta Sul
-        if x + 1 < tamanho and self.pode_mover(x + 1, y) and self.grid[x + 1][y] in sujeira:
-            espaço_sujo = {"coord": (x+1,y), "pontos": self.detecta_tipo_sujeira(self.grid[x+1][y])}
-            self.beliefs.append(espaço_sujo)
-        #Detecta Norte
-        if x - 1 >= 0 and self.pode_mover(x - 1, y) and self.grid[x - 1][y] in sujeira:
-            espaço_sujo = {"coord": (x-1,y), "pontos": self.detecta_tipo_sujeira(self.grid[x-1][y])}
-            self.beliefs.append(espaço_sujo)
-        #Detecta leste
-        if y + 1 < tamanho and self.pode_mover(x, y + 1) and self.grid[x][y + 1] in sujeira:
-            espaço_sujo = {"coord": (x,y+1), "pontos": self.detecta_tipo_sujeira(self.grid[x][y+1])}
-            self.beliefs.append(espaço_sujo)
-        #Detecta oeste
-        if y - 1 >= 0 and self.pode_mover(x, y - 1) and self.grid[x][y - 1] in sujeira:
-            espaço_sujo = {"coord": (x,y-1), "pontos": self.detecta_tipo_sujeira(self.grid[x][y-1])}
-            self.beliefs.append(espaço_sujo)
+        for i in range(linhas):
+            for j in range(colunas):
+                if self.grid[i][j] in sujeira:
+                    b = {"coord": (i, j), "pontos": self.detecta_tipo_sujeira(self.grid[i][j])}
+                    self.beliefs.append(b)
 
     def distancia_a_estrela(self,inicio,fim):
         if inicio == fim:
@@ -309,28 +297,142 @@ class Agente_BDI:
                 self.update_intentions(posicao_atual)
         
 
-def simular():
-    agente = Agente_BDI(tamanho=5)
-    x, y = 0,0
+def simular(tamanho=5, max_steps=100, intervalo_ms=500):
+    agente = Agente_BDI(tamanho=tamanho)
+    x, y = 0, 0
 
-    while agente.bateria > 0:
+    estados = []
+    total_pontuacao = 0
+
+    for passo in range(max_steps):
+        if agente.bateria <= 0:
+            break
+
         agente.perceive((x, y))
-        agente.update_desires((x,y))
-        agente.update_intentions((x,y))
-        if agente.intentions:
-            acao = agente.intentions[0]
-            if acao == "aspirar":
-                agente.grid[x][y] = "limpo"
-                agente.bateria -= 2
-            elif acao == "N":
+        dedup = {}
+        for b in agente.beliefs:
+            dedup[b['coord']] = b
+        agente.beliefs = list(dedup.values())
+
+        agente.update_desires((x, y))
+        agente.update_intentions((x, y))
+
+        if not agente.intentions:
+            break
+
+        acao = agente.intentions[0]
+
+        delta = 0
+        if acao == "aspirar":
+            conteudo = agente.grid[x][y]
+            sujeira = {"poeira", "liquido", "detritos"}
+            if conteudo in sujeira:
+                delta = agente.detecta_tipo_sujeira(conteudo)
+            agente.grid[x][y] = "limpo"
+            agente.bateria -= 2
+            agente.beliefs = [b for b in agente.beliefs if b['coord'] != (x, y)]
+        elif acao == "N":
+            if x > 0 and agente.pode_mover(x - 1, y):
                 x -= 1
                 agente.bateria -= 1
-            elif acao == "S":
+        elif acao == "S":
+            if x < tamanho - 1 and agente.pode_mover(x + 1, y):
                 x += 1
                 agente.bateria -= 1
-            elif acao == "L":
+        elif acao == "L":
+            if y < tamanho - 1 and agente.pode_mover(x, y + 1):
                 y += 1
                 agente.bateria -= 1
-            elif acao == "O":
+        elif acao == "O":
+            if y > 0 and agente.pode_mover(x, y - 1):
                 y -= 1
                 agente.bateria -= 1
+        else:
+            break
+
+        total_pontuacao += delta
+
+        estados.append({
+            'grid': np.copy(agente.grid),
+            'x': x,
+            'y': y,
+            'bateria': agente.bateria,
+            'pontuacao': total_pontuacao,
+            'passo': passo
+        })
+
+    if not estados:
+        print("Nenhum estado gerado")
+        return
+
+    fig, ax = plt.subplots(figsize=(5, 5))
+    tamanho = len(estados[0]['grid'])
+    ax.set_xticks(np.arange(tamanho + 1) - 0.5)
+    ax.set_yticks(np.arange(tamanho + 1) - 0.5)
+    ax.grid(True)
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.invert_yaxis()
+    ax.set_xlim(-0.5, tamanho - 0.5)
+    ax.set_ylim(-0.5, tamanho - 0.5)
+
+    agent_marker = ax.plot([], [], 'o', markersize=18)[0]
+    score_text = ax.text(0.01, 0.99, "", transform=ax.transAxes, fontsize=12,
+                         va='top', ha='left', bbox=dict(facecolor='white', alpha=0.8, edgecolor='none', pad=4))
+
+    texts = [[None for _ in range(tamanho)] for _ in range(tamanho)]
+    movel_patches = []
+
+    grid0 = estados[0]['grid']
+    for i in range(tamanho):
+        for j in range(tamanho):
+            valor = grid0[i][j]
+            if valor == "poeira":
+                txt = 'P'; cor = 'brown'
+            elif valor == "liquido":
+                txt = 'L'; cor = 'blue'
+            elif valor == "detritos":
+                txt = 'D'; cor = 'black'
+            elif valor == "movel":
+                rect = plt.Rectangle((j - 0.5, i - 0.5), 1, 1, color='gray')
+                ax.add_patch(rect)
+                movel_patches.append(rect)
+                txt = ''; cor = 'black'
+            else:
+                txt = '.'; cor = 'lightgray'
+            texts[i][j] = ax.text(j, i, txt, ha='center', va='center', fontsize=14, color=cor, weight='bold')
+
+    primeiro = estados[0]
+    agent_marker.set_data([primeiro['y']], [primeiro['x']])
+    score_text.set_text(f"Pontuação: {primeiro.get('pontuacao', 0)}  Bateria: {primeiro.get('bateria', 0)}")
+
+    def update(frame):
+        estado = estados[frame]
+        grid_atual = estado['grid']
+        x, y = estado['x'], estado['y']
+
+        for i in range(tamanho):
+            for j in range(tamanho):
+                cell = grid_atual[i][j]
+                t = texts[i][j]
+                if cell == "limpo":
+                    t.set_text('.'); t.set_color('gray')
+                elif cell == "poeira":
+                    t.set_text('P'); t.set_color('brown')
+                elif cell == "liquido":
+                    t.set_text('L'); t.set_color('blue')
+                elif cell == "detritos":
+                    t.set_text('D'); t.set_color('black')
+                elif cell == "movel":
+                    t.set_text('')
+                else:
+                    t.set_text('.'); t.set_color('lightgray')
+
+        agent_marker.set_data([y], [x])
+
+        score_text.set_text(f"Pontuação: {estado.get('pontuacao', 0)}  Bateria: {estado.get('bateria', 0)}")
+        artists = [agent_marker, score_text] + [t for row in texts for t in row]
+        return artists
+
+    ani = FuncAnimation(fig, update, frames=len(estados), interval=intervalo_ms, blit=False, repeat=False)
+    plt.show()
